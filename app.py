@@ -1,18 +1,14 @@
 import os
-import json
 import dash
 import meshio
 import numpy as np
-import dash_daq as daq
 import plotly.graph_objects as go
 import dash_core_components as dcc
 import dash_html_components as html
-import dash_colorscales as dcs
 import dash_mantine_components as dmc
 
 from numpy import sin, cos, pi
-from dash.dependencies import Input, Output, State
-from dash.exceptions import PreventUpdate
+from dash.dependencies import Input, Output
 
 app = dash.Dash(
     __name__,
@@ -52,7 +48,7 @@ app.layout = html.Div(
                                 html.Div(
                                     [
                                         html.A(
-                                            "View on GitHub",
+                                            "GitHub repository",
                                             href=GITHUB_LINK,
                                             target="_blank",
                                         )
@@ -81,7 +77,7 @@ app.layout = html.Div(
                                     "Select first gradient color", className="subheader"
                                 ),
                                 dmc.ColorPicker(
-                                    id="color-picker",
+                                    id="color1-picker",
                                     format="rgb",
                                     value="rgb(0, 0, 255)",
                                     fullWidth=True,
@@ -125,7 +121,7 @@ app.layout = html.Div(
                                     className="subheader",
                                 ),
                                 dmc.ColorPicker(
-                                    id="high-picker",
+                                    id="color2-picker",
                                     format="rgb",
                                     value="rgb(255, 255, 255)",
                                     fullWidth=True,
@@ -136,68 +132,6 @@ app.layout = html.Div(
                     ],
                     className="colorscale pb-20",
                 ),
-                #     html.Div(
-                #         [
-                #             html.Span("Select XYZ range", className="subheader"),
-                #             dmc.Space(h=10),
-                #             html.Span(
-                #                 "Move the slider to change the highlight region on the graph.",
-                #                 className="small-text",
-                #             ),
-                #             dmc.Space(h=20),
-                #             html.P("Range of x coordinates: "),
-                #             dcc.RangeSlider(
-                #                 min=-0.7744977881566031 - 0.01,
-                #                 max=0.44003154043624987 + 0.01,
-                #                 id="x-range",
-                #                 marks={
-                #                     -0.7744977881566031: {"label": "-0.7745"},
-                #                     0: {"label": "0"},
-                #                     0.44003154043624984: {"label": "0.4400"},
-                #                 },
-                #                 value=[-0.05, 0.45],
-                #                 tooltip={
-                #                     "placement": "bottom",
-                #                     "always_visible": False,
-                #                 },
-                #             ),
-                #             dmc.Space(h=20),
-                #             html.P("Range of y coordinates: "),
-                #             dcc.RangeSlider(
-                #                 min=-0.5474345419762712 - 0.01,
-                #                 max=0.43922766312325695 + 0.01,
-                #                 id="y-range",
-                #                 marks={
-                #                     -0.5474345419762712: {"label": "-0.5474"},
-                #                     0: {"label": "0"},
-                #                     0.43922766312325700: {"label": "0.4392"},
-                #                 },
-                #                 value=[0.25, 0.44],
-                #                 tooltip={
-                #                     "placement": "bottom",
-                #                     "always_visible": False,
-                #                 },
-                #             ),
-                #             dmc.Space(h=20),
-                #             html.P("Range of z coordinates: "),
-                #             dcc.RangeSlider(
-                #                 min=-0.8212642714662288 - 0.01,
-                #                 max=0.6537790158429256 + 0.01,
-                #                 id="z-range",
-                #                 marks={
-                #                     -0.8212642714662288: {"label": "-0.7213"},
-                #                     0: {"label": "0"},
-                #                     0.6537790158429256: {"label": "0.6538"},
-                #                 },
-                #                 value=[-0.36, 0],
-                #                 tooltip={
-                #                     "placement": "bottom",
-                #                     "always_visible": False,
-                #                 },
-                #             ),
-                #         ],
-                #         className="pb-20",
-                #     ),
             ],
             className="one-third column app__right__section",
         ),
@@ -230,7 +164,7 @@ def select(x, y, z, x_range, y_range, z_range):
     return False
 
 
-def plot_obj(file, highlight, color):  # , x_range, y_range, z_range):
+def plot_obj(file, color1, color2):
     mesh_data = meshio.read(file)
     vertices = mesh_data.points
     triangles = mesh_data.cells_dict["triangle"]
@@ -239,14 +173,14 @@ def plot_obj(file, highlight, color):  # , x_range, y_range, z_range):
     A = rot_x(pi / 4)
     B = rot_z(4 * pi / 9 + pi / 4)
 
-    # Apply the product of the two rotations to the object vertices:
+    # apply the product of the two rotations to the object vertices:
     new_vertices = np.einsum("ik, kj -> ij", vertices, (np.dot(B, A)).T)
     # new_vertices have the shape (n_vertices, 3)
 
     x, y, z = new_vertices.T
     I, J, K = triangles.T
     tri_points = new_vertices[triangles]
-    pl_mygrey = [0, color], [1.0, highlight]
+    pl_mygrey = [0, color1], [1.0, color2]
 
     pl_mesh = go.Mesh3d(
         x=x,
@@ -295,7 +229,7 @@ def plot_obj(file, highlight, color):  # , x_range, y_range, z_range):
     )
 
     layout = go.Layout(
-        title="3D Human Mesh with Highlighting",
+        title="3D Human Mesh with Gradient",
         font=dict(size=13, color="white"),
         scene_xaxis_visible=True,
         scene_yaxis_visible=True,
@@ -312,16 +246,13 @@ def plot_obj(file, highlight, color):  # , x_range, y_range, z_range):
     Output("highlight-3d-graph", "figure"),
     [
         Input("model-options", "value"),
-        Input("color-picker", "value"),
-        Input("high-picker", "value"),
-        # Input("x-range", "value"),
-        # Input("y-range", "value"),
-        # Input("z-range", "value"),
+        Input("color1-picker", "value"),
+        Input("color2-picker", "value"),
     ],
 )
-def brain_graph_handler(val, highlight, color):  # , x_range, y_range, z_range):
+def brain_graph_handler(val, color1, color2):
     file = "data/" + str(val) + ".obj"
-    figure = plot_obj(file, highlight, color)  #  x_range, y_range, z_range)
+    figure = plot_obj(file, color1, color2)
     return figure
 
 
